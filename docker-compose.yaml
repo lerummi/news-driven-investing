@@ -1,0 +1,155 @@
+version: "3"
+services:
+  jupyterlab:
+    build: .
+    container_name: news-driven-investing-jupyterlab
+    ports:
+      - 8888:8888
+    volumes:
+      - "./data:/home/jovyan/data"
+      - "./:/home/jovyan/work"
+      - "./mlflow/mlartifacts:/mlartifacts"
+    environment:
+      - PYTHONPATH=$PYTHONPATH:/home/jovyan/work/src
+      - DATA_DIR=/home/jovyan/data
+      - CONFIG_DIR=/home/jovyan/config
+      - JUPYTER_ENABLE_LAB=yes
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    entrypoint: start-notebook.sh --NotebookApp.token="" --NotebookApp.notebook_dir=/home/jovyan/work
+    networks:
+      - net
+
+  mlflow:
+    build:
+    	context: mlflow
+    container_name: news-driven-investing-mlflow
+    ports:
+      - 5000:5000
+    volumes:
+      - "./mlflow/mlruns:/mlruns"
+      - "./mlflow/mlartifacts:/mlartifacts"
+    networks:
+      - net
+
+  serving:
+    build:
+      context: serving
+    container_name: news-driven-investing-serving
+    ports:
+      - 8001:8001
+      - 8002:8002
+      - 8003:8003
+      - 8004:8004
+      - 8005:8005
+      - 8006:8006
+      - 8007:8007
+      - 8008:8008
+      - 8009:8009
+    volumes:
+      - "./mlflow/mlruns:/mlruns"
+      - "./mlflow/mlartifacts:/mlartifacts"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    networks:
+      - net
+    command: tail -F anything
+
+  # This service runs the postgres DB used by dagster for run storage, schedule storage,
+  # and event log storage.
+  dagster_storage:
+    image: postgres:15
+    container_name: news-driven-investing-dagster-storage
+    environment:
+      POSTGRES_USER: "postgres_user"
+      POSTGRES_PASSWORD: "postgres_password"
+      POSTGRES_DB: "postgres_db"
+    networks:
+      - net
+
+  # This service runs dagit, which loads your user code from the user code container.
+  # Since our instance uses the QueuedRunCoordinator, any runs submitted from dagit will be put on
+  # a queue and later dequeued and launched by dagster-daemon.
+  dagster_dagit:
+    build:
+      context: dagster
+    entrypoint:
+      - dagit
+      - -h
+      - "0.0.0.0"
+      - -p
+      - "3000"
+      - -w
+      - workspace.yaml
+    container_name: news-driven-investing-dagster-dagit
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000"
+    environment:
+      DAGSTER_POSTGRES_USER: "postgres_user"
+      DAGSTER_POSTGRES_PASSWORD: "postgres_password"
+      DAGSTER_POSTGRES_DB: "postgres_db"
+    volumes: # Make docker client accessible so we can terminate containers from dagit
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/io_manager_storage:/tmp/io_manager_storage
+    networks:
+      - net
+    depends_on:
+      - dagster_storage
+
+  # This service runs the dagster-daemon process, which is responsible for taking runs
+  # off of the queue and launching them, as well as creating runs from schedules or sensors.
+  dagster_daemon:
+    build:
+      context: dagster
+    entrypoint:
+      - dagster-daemon
+      - run
+    container_name: news-driven-investing-dagster-daemon
+    restart: on-failure
+    environment:
+      DAGSTER_POSTGRES_USER: "postgres_user"
+      DAGSTER_POSTGRES_PASSWORD: "postgres_password"
+      DAGSTER_POSTGRES_DB: "postgres_db"
+    volumes: # Make docker client accessible so we can launch containers using host docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/io_manager_storage:/tmp/io_manager_storage
+    networks:
+      - net
+    depends_on:
+      - dagster_storage
+
+   dagster-project-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint:
+      - dagster
+      - api
+      - grpc
+      - -h
+      - "0.0.0.0"
+      - -p
+      - "4000"
+      - -m
+      - news_driven_investing.definitions
+    expose:
+      - "3000"
+    container_name: news-driven-investing-dagster-project-code
+    ports:
+      - "4000:4000"
+    volumes:
+      - "./news_driven_investing:/opt/dagster/app"
+      - "./data:/opt/dagster/app/data"
+    environment:
+      DAGSTER_POSTGRES_USER: "postgres_user"
+      DAGSTER_POSTGRES_PASSWORD: "postgres_password"
+      DAGSTER_POSTGRES_DB: "postgres_db"
+      DATA_DIR: "/opt/dagster/app/data"
+    networks:
+      - net
+
+networks:
+  net:
+    name: net
+    driver: bridge

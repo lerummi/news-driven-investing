@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "news-driven-investing"
+version = "0.1.0"
+description = "Project leveraging recent news data to develop predictive models and insights, empowering investors to make informed decisions in the stock market."
+authors = ["lerummi <martin.krause.85@gmx.de>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "news_driven_investing"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.0.2"
+scikit-learn = "^1.2.2"
+pyarrow = "^12.0.1"
+mlflow = "^2.4.1"
+dagster = "^1.3.11"
+dagster-postgres = "^0.19.11"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+pre-commit = "^3.3.3"
+ruff = "^0.0.275"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
