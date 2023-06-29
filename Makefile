@@ -55,11 +55,10 @@ run: DARGS?=-e JUPYTER_ENABLE_LAB=yes
 run: IMAGE_TAG?=latest
 run: PORT?=8888
 run: JARGS?=start-notebook.sh --NotebookApp.token="" --NotebookApp.notebook_dir=/home/jovyan/work
-run: CONTAINER_NAME=luxoft-jupyterlab
 run: DATA_DIR?=`pwd`/data
 run: ## Run container
 	docker run \
-	-it --rm -p $(PORT):8888 --name $(CONTAINER_NAME) \
+	-it --rm -p $(PORT):8888 \
 	-e PYTHONPATH=$(PYTHONPATH):/home/jovyan/work/src \
 	-e DATA_DIR=/home/jovyan/data \
 	-v $(DATA_DIR):/home/jovyan/data \
@@ -76,14 +75,39 @@ prepare: ## Prepare directories for logging to MLflow
 
 ##@ Build stack
 build-compose: DARGS?=--no-cache
-build-compose: ## Run composition locally
+build-compose: ## Build composition locally
 	$(MAKE) prepare
 	docker-compose build $(DARGS)
 
-##@ Build and run stack
-run-compose: ## Run composition locally
+##@ Build and run jupyter stack
+run-jupyter: ## Run composition locally
 	$(MAKE) prepare
-	docker-compose up --build
+	docker-compose --profile jupyter up --build
+
+##@ Build and run ingestion stack
+run-ingest: ## Run composition locally
+	$(MAKE) prepare
+	docker-compose --profile ingest up --build
+
+##@ Build and run training stack
+run-train: ## Run composition locally
+	$(MAKE) prepare
+	docker-compose --profile train up --build
+
+##@ Build and run production stack
+run-production: ## Run composition locally
+	$(MAKE) prepare
+	docker-compose --profile production up --build
+
+##@ Build and run jupyter, ingestion, training and production stack
+run-all: ## Run composition locally
+	$(MAKE) prepare
+	docker-compose \
+	--profile jupyter \
+	--profile ingest \
+	--profile train \
+	--profile production \
+	up --build
 
 ##@ Serving a trained model using a webserver. Note: `make run-compose` must be done first!!!
 serve: RUN_ID=

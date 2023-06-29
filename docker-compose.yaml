@@ -1,7 +1,9 @@
 version: "3"
 services:
   jupyterlab:
-    build: .
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
     container_name: news-driven-investing-jupyterlab
     ports:
       - 8888:8888
@@ -9,8 +11,10 @@ services:
       - "./data:/home/jovyan/data"
       - "./:/home/jovyan/work"
       - "./mlflow/mlartifacts:/mlartifacts"
+    env_file:
+      - .env
     environment:
-      - PYTHONPATH=$PYTHONPATH:/home/jovyan/work/src
+      - PYTHONPATH=$PYTHONPATH:/home/jovyan/work/
       - DATA_DIR=/home/jovyan/data
       - CONFIG_DIR=/home/jovyan/config
       - JUPYTER_ENABLE_LAB=yes
@@ -18,10 +22,11 @@ services:
     entrypoint: start-notebook.sh --NotebookApp.token="" --NotebookApp.notebook_dir=/home/jovyan/work
     networks:
       - net
+    profiles: ["jupyter"]
 
   mlflow:
     build:
-    	context: mlflow
+      context: mlflow
     container_name: news-driven-investing-mlflow
     ports:
       - 5000:5000
@@ -30,10 +35,12 @@ services:
       - "./mlflow/mlartifacts:/mlartifacts"
     networks:
       - net
+    profiles: ["jupyter", "train", "production"]
 
   serving:
     build:
-      context: serving
+      context: .
+      dockerfile: serving/Dockerfile
     container_name: news-driven-investing-serving
     ports:
       - 8001:8001
@@ -53,6 +60,7 @@ services:
     networks:
       - net
     command: tail -F anything
+    profiles: ["production"]
 
   # This service runs the postgres DB used by dagster for run storage, schedule storage,
   # and event log storage.
@@ -65,6 +73,7 @@ services:
       POSTGRES_DB: "postgres_db"
     networks:
       - net
+    profiles: ["train", "ingest", "production"]
 
   # This service runs dagit, which loads your user code from the user code container.
   # Since our instance uses the QueuedRunCoordinator, any runs submitted from dagit will be put on
@@ -96,6 +105,7 @@ services:
       - net
     depends_on:
       - dagster_storage
+    profiles: ["train", "ingest", "production"]
 
   # This service runs the dagster-daemon process, which is responsible for taking runs
   # off of the queue and launching them, as well as creating runs from schedules or sensors.
@@ -118,11 +128,11 @@ services:
       - net
     depends_on:
       - dagster_storage
+    profiles: ["train", "ingest", "production"]
 
-   dagster-project-code:
+  dagster-project-code:
     build:
       context: .
-      dockerfile: Dockerfile
     entrypoint:
       - dagster
       - api
@@ -133,21 +143,22 @@ services:
       - "4000"
       - -m
       - news_driven_investing.definitions
-    expose:
-      - "3000"
     container_name: news-driven-investing-dagster-project-code
     ports:
       - "4000:4000"
     volumes:
-      - "./news_driven_investing:/opt/dagster/app"
-      - "./data:/opt/dagster/app/data"
+      - "./:/opt/dagster/app"
+      - "./data/storage:/opt/dagster/dagster_home/storage"
+    env_file:
+      - .env
     environment:
       DAGSTER_POSTGRES_USER: "postgres_user"
       DAGSTER_POSTGRES_PASSWORD: "postgres_password"
       DAGSTER_POSTGRES_DB: "postgres_db"
-      DATA_DIR: "/opt/dagster/app/data"
+      STORAGE_DIR: "/opt/dagster/dagster_home/storage"
     networks:
       - net
+    profiles: ["train", "ingest", "production"]
 
 networks:
   net:

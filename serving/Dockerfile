@@ -33,4 +33,4 @@ RUN wget \
 ENV PATH=$CONDA_DIR/bin:$PATH
 
 # Requirements are installed here to ensure they will be cached.
-COPY serve-model.sh serve-model.sh
+COPY serving/serve-model.sh serve-model.sh
