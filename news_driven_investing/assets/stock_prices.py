@@ -2,9 +2,7 @@ import pandas
 from typing import List, Dict
 
 from dagster import asset
-from dagster import (
-    StaticPartitionsDefinition
-)
+from dagster import StaticPartitionsDefinition
 from dagster import get_dagster_logger
 
 from news_driven_investing.config.settings import settings
@@ -12,11 +10,9 @@ from news_driven_investing.utils import alpha_vantage
 
 
 @asset(
-    partitions_def=StaticPartitionsDefinition(
-        list(settings.ALPHA_VANTAGE_SYMBOLS)
-    ),
+    partitions_def=StaticPartitionsDefinition(list(settings.ALPHA_VANTAGE_SYMBOLS)),
     group_name="stock_collect",
-    io_manager_key="pandas_io_manager"
+    io_manager_key="pandas_io_manager",
 )
 def stock_prices(context) -> pandas.DataFrame:
     """
@@ -29,8 +25,7 @@ def stock_prices(context) -> pandas.DataFrame:
     symbol = settings.ALPHA_VANTAGE_SYMBOLS[key]
 
     response = alpha_vantage.request_daily_prices(
-        symbol,
-        start_date=settings.START_DATE
+        symbol, start_date=settings.START_DATE
     )
 
     msg = f"Status Code is {response.status_code}\n"
@@ -41,21 +36,19 @@ def stock_prices(context) -> pandas.DataFrame:
 
     if response.status_code == 200:
         logger.info(f"Requesting activities successful!\n{msg}")
-    
+
     else:
-        error_msg = f"Requesting activities failed!\n{msg}" 
+        error_msg = f"Requesting activities failed!\n{msg}"
         logger.error(error_msg)
 
     response_json = response.json()
 
     result = pandas.DataFrame.from_dict(
-        response_json["Time Series (Daily)"],
-        orient="index"
+        response_json["Time Series (Daily)"], orient="index"
     ).reset_index(names=["date"])
 
     # Add equity & symbol
     result["equity"] = key
     result["symbol"] = symbol
 
-    # Limit result to start_date
-    return result.query(f"date >= '{settings.START_DATE}'")
+    return result

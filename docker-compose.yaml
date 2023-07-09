@@ -16,6 +16,7 @@ services:
     environment:
       - PYTHONPATH=$PYTHONPATH:/home/jovyan/work/
       - DATA_DIR=/home/jovyan/data
+      - STORAGE_DIR=/home/jovyan/data/storage
       - CONFIG_DIR=/home/jovyan/config
       - JUPYTER_ENABLE_LAB=yes
       - MLFLOW_TRACKING_URI=http://mlflow:5000
